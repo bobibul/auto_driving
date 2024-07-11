@@ -27,7 +27,7 @@ DST_POINTS = np.array([
 ], dtype=np.int32)
 
 """-----------------------------------------------------"""
-
+# 안녕하세요
 
 class Camera(threading.Thread):
 
