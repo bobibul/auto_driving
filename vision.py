@@ -138,25 +138,6 @@ class Camera(threading.Thread):
         bird_eye_view = cv2.warpPerspective(self.frame, M, (CAMERA_WIDTH, CAMERA_HEIGHT))
         return bird_eye_view
 
-    def point_analyze(self, gray, line, point_gap, len_threshold):
-        disparity = [0, 0]
-
-        for idx in range(2):
-            yplus = line[idx + 1] + point_gap if line[idx + 1] + point_gap < self.row else self.row - 1
-            yminus = line[idx + 1] - point_gap if line[idx + 1] - point_gap >= 0 else 0
-
-            if yplus < 0 or yminus >= self.row:
-                break
-            elif yplus >= self.row or yminus < 0:
-                break
-
-            disparity[idx] = np.abs(gray[yplus][line[idx]] - gray[yminus][line[idx]])
-
-        if np.average(disparity) > len_threshold:
-            return True
-        else:
-            return False
-        
     def new_line_detection(self, lines):
         if(lines is not None):
             left_lines = []
@@ -184,40 +165,7 @@ class Camera(threading.Thread):
                 else:
                     print(f"turn right {angle}")
         
-    def line_detection(self, height = 0, width = 100, print_enable = True, gap = 40, threshold = 150):
-        if self.lines is not None:
-            prediction = None
-            new_lines, real_lines = [], []
-            for line in self.lines:
-                xa, ya, xb, yb = line[0]
-
-                # x range : 0 ~ self.col / y range : 0 ~ self.row
-                if np.abs(yb - ya) > height and np.abs(xb - xa) < width:
-                    if self.point_analyze(self.blurring, line[0], gap, threshold):
-                        for idx in range(len(new_lines)):
-                            if np.abs(new_lines[:][idx][1] - ya) < VARIANCE:
-                                if np.abs(new_lines[:][idx][3] - yb) < VARIANCE:
-
-                                    grad = (xb - xa) / -(yb - ya)  # the third quadrant
-
-                                    if np.abs(grad) < FORWARD_THRESHOLD:
-                                        prediction = FORWARD
-                                    elif grad > 0:
-                                        prediction = RIGHT
-                                    elif grad < 0:
-                                        prediction = LEFT
-
-                                    # real_lines.append([xa, ya, xb, yb])
-                                    print(self.frame.shape[0], self.frame.shape[1])
-                                    
-                                    cv2.line(self.canny, (xa, ya), (xb, yb), color=[0, 255, 0], thickness=5)
-                        new_lines.append([xa, ya, xb, yb])
-            if print_enable:
-                if prediction is not None:
-                    print("Vehicle Direction: ", DIRECTION[prediction])
-
-
-
+   
 
 
 
