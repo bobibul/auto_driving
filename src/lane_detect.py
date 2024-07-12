@@ -1,12 +1,12 @@
 import cv2
 import numpy as np
-from vision import Camera
+from camera_detect import Camera
+from serial_connect import SerialConnect
 
 """--------------Computer Vision Variable--------------"""
 NULL = 0
 VARIANCE = 30
 SATURATION = 150
-DIRECTION = ("FORWARD", "LEFT", "RIGHT")
 CAMERA_HEIGHT = 480
 CAMERA_WIDTH = 640
 THRESHOLD = 50
@@ -24,7 +24,13 @@ DST_POINTS = np.array([
 
 """-----------------------------------------------------"""
 
-class Lane(Camera):
+class Lane(Camera, SerialConnect):
+
+    def __init__(self, camera_id, port):
+        Camera.__init__(self, camera_id)
+        SerialConnect.__init__(self, port)
+        print("차선인식 카메라 연결되었습니다.")
+
 
     def lane_detect(self):
         while(self.runing):
