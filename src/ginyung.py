@@ -91,20 +91,169 @@ class libARDUINO(object):
         time.sleep(self.wait_time)
         return ser
 
+
+"""
+-------------------------------------------------------------------
+  CLASS PURPOSE: LiDAR Sensor Exercise Library
+  Author: YoungSoo Do
+  Revised: 2022-11-18
+-------------------------------------------------------------------
+"""
+class libLIDAR(object):
+    def __init__(self, port):
+        self.rpm = 0
+        self.lidar = RPLidar(port)
+        self.scan = []
+
+    def init(self):
+        info = self.lidar.get_info()
+        print(info)
+
+    def getState(self):
+        health = self.lidar.get_health()
+        print(health)
+
+    def scanning(self):
+        scan_list = []
+        iterator = self.lidar.iter_measures(SCAN_TYPE, MAX_BUFFER_SIZE)
+        for new_scan, quality, angle, distance in iterator:
+            if new_scan:
+                if len(scan_list) > SAMPLE_RATE:
+                    np_data = np.array(list(scan_list))
+                    yield np_data[:, 1:]
+                scan_list = []
+            if distance > MIN_DISTANCE:
+                scan_list.append((quality, angle, distance))
+
+    def stop(self):
+        self.lidar.stop()
+        self.lidar.stop_motor()
+        self.lidar.disconnect()
+
+    def setRPM(self, rpm):
+        self.lidar.motor_speed = rpm
+
+    def getRPM(self):
+        return self.lidar.motor_speed
+
+    def getAngleRange(self, scan, minAngle, maxAngle):
+        data = np.array(scan)
+        condition = np.where((data[:, 0] < maxAngle) & (data[:, 0] > minAngle))
+        return data[condition]
+
+    def getDistanceRange(self, scan, minDist, maxDist):
+        data = np.array(scan)
+        condition = np.where((data[:, 1] < maxDist) & (data[:, 1] > minDist))
+        return data[condition]
+
+    def getAngleDistanceRange(self, scan, minAngle, maxAngle, minDist, maxDist):
+        data = np.array(scan)
+        condition = np.where((data[:, 0] < maxAngle) & (data[:, 0] > minAngle) & (data[:, 1] < maxDist) & (data[:, 1] > minDist))
+        return data[condition]
+
+
+"""
+-------------------------------------------------------------------
+  CLASS PURPOSE: Camera Sensor Exercise Library
+  Author: Jonghun Kim
+  Revised: 2022-11-12
+-------------------------------------------------------------------
+"""
+# noinspection PyMethodMayBeStatic
+class libCAMERA(object):
+    def __init__(self):
+        self.capnum = 0
+        self.row, self.col, self.dim = (0, 0, 0)
+        self.nothing_flag = False
+        self.cam_flag = False
+
+    def loop_break(self):
+        if cv2.waitKey(10) & 0xFF == ord('q'):
+            print("Camera Reading is ended.")
+            return True
+        else:
+            return False
+
+    def file_read(self, img_path):
+        return np.array(cv2.imread(img_path))
+
+
+    def initial_setting(self, cam0port=0, cam1port=1, capnum=1):
+        # OpenCV Initial Setting
+        print("OpenCV Version:", cv2.__version__)
+        channel0 = None
+        channel1 = None
+        self.capnum = capnum
+
+        if capnum == 1:
+            channel0 = cv2.VideoCapture(cv2.CAP_DSHOW + cam0port)
+            if channel0.isOpened():
+                print("Camera Channel0 is enabled!")
+        elif capnum == 2:
+            channel0 = cv2.VideoCapture(cv2.CAP_DSHOW + cam0port)
+            if channel0.isOpened():
+                print("Camera Channel0 is enabled!")
+
+            channel1 = cv2.VideoCapture(cv2.CAP_DSHOW + cam1port)
+            if channel1.isOpened():
+                print("Camera Channel1 is enabled!")
+
+        return channel0, channel1
+
+    def camera_read(self, cap1, cap2=None):
+        result, capset = [], [cap1, cap2]
+
+        for idx in range(0, self.capnum):
+            ret, frame = capset[idx].read()
+            result.extend([ret, frame])
+
+        return result
+
+    def image_show(self, frame0, frame1=None):
+        if frame1 is None:
+            cv2.imshow('frame0', frame0)
+        else:
+            cv2.imshow('frame0', frame0)
+            cv2.imshow('frame1', frame1)
+
+    
+    # def detect_color(self, img):
+    #     # Convert to HSV color space
+    #     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    #     # Define range of blend color in HSV
+    #     white_lower = np.array([0, 0, 200])
+    #     white_upper = np.array([179, 64, 255])
+
+    #     # Threshold the HSV image to get only white colors
+    #     white_mask = cv2.inRange(hsv, white_lower, white_upper)
+
+    #     # Threshold the HSV image to get blend colors
+    #     white_color = cv2.bitwise_and(img, img, mask=white_mask)
+    #     return white_color
+
     def detect_color(self, img):
         # Convert to HSV color space
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
+    
         # Define range of blend color in HSV
         white_lower = np.array([0, 0, 200])
         white_upper = np.array([179, 64, 255])
-
+        
+        # Slightly greenish white color range in HSV
+        greenish_white_lower = np.array([60, 0, 200])
+        greenish_white_upper = np.array([120, 150, 255])
+    
         # Threshold the HSV image to get only white colors
         white_mask = cv2.inRange(hsv, white_lower, white_upper)
-
+        greenish_white_mask = cv2.inRange(hsv, greenish_white_lower, greenish_white_upper)
+    
+        # Combine the masks
+        combined_mask = cv2.bitwise_or(white_mask, greenish_white_mask)
+    
         # Threshold the HSV image to get blend colors
-        white_color = cv2.bitwise_and(img, img, mask=white_mask)
-        return white_color
+        combined_color = cv2.bitwise_and(img, img, mask=combined_mask)
+        return combined_color
 
     def img_warp(self, img, white_color):
         # shape of img
@@ -203,8 +352,7 @@ class libARDUINO(object):
         # 개수가 너무 많으면 연산량이 증가하여 시간이 오래 걸립니다.
         window_height = self.window_height
         # 윈도우의 너비를 지정합니다. 윈도우가 옆 차선까지 넘어가지 않게 사이즈를 적절히 지정합니다.
-        # margin = 80
-        margin = 10 
+        margin = 80
         # 탐색할 최소 픽셀의 개수를 지정합니다.
         min_pix = min_pix = round((margin * 2 * window_height) * 0.0031)
 
@@ -231,23 +379,23 @@ class libARDUINO(object):
             win_x_right_low = right_x_current - margin
             win_x_right_high = right_x_current + margin
 
-            # # window 시각화입니다.
-            # if left_x_current != 0:
-            #     cv2.rectangle(
-            #         out_img,
-            #         (win_x_left_low, win_y_low),
-            #         (win_x_left_high, win_y_high),
-            #         (0, 255, 0),
-            #         2,
-            #     )
-            # if right_x_current != midpoint:
-            #     cv2.rectangle(
-            #         out_img,
-            #         (win_x_right_low, win_y_low),
-            #         (win_x_right_high, win_y_high),
-            #         (0, 0, 255),
-            #         2,
-            #     )
+            # window 시각화입니다.
+            if left_x_current != 0:
+                cv2.rectangle(
+                    out_img,
+                    (win_x_left_low, win_y_low),
+                    (win_x_left_high, win_y_high),
+                    (0, 255, 0),
+                    2,
+                )
+            if right_x_current != midpoint:
+                cv2.rectangle(
+                    out_img,
+                    (win_x_right_low, win_y_low),
+                    (win_x_right_high, win_y_high),
+                    (0, 0, 255),
+                    2,
+                )
 
             # 왼쪽 오른쪽 각 차선 픽셀이 window안에 있는 경우 index를 저장합니다.
             good_left_idx = (
@@ -456,10 +604,13 @@ class libARDUINO(object):
         #if self.end_time - self.start_time >= 0.1:
         #    self.car_ctrl_pub.publish(ctrl_cmd_msg)
         self.cam_flag = False
+        print("offset: ",vehicle_offset, "  steer: ",cam_steer)
 
 
         cv2.namedWindow("img", cv2.WINDOW_NORMAL)
         cv2.namedWindow("sliding_window_img", cv2.WINDOW_NORMAL)
+        # cv2.imshow("blend_color", blend_color)
+        # cv2.imshow("blend_line", blend_line)
         cv2.imshow("img", img)
         cv2.imshow("sliding_window_img", sliding_window_img)
         cv2.waitKey(1)
