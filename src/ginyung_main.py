@@ -1,44 +1,27 @@
+from ultralytics import YOLO
+import keyboard
 import ginyung as fl
+import serial
+import time
 
-EPOCH = 500000
+PORT = '/dev/ttyUSB0'
 
 if __name__ == "__main__":
     # Exercise Environment Setting
     env = fl.libCAMERA()
-
-    """ Exercise 1: RGB Color Value Extracting """
-    ############## YOU MUST EDIT ONLY HERE ##############
-    # example = env.file_read("./Example Image.jpg")
-    # R, G, B = env.extract_rgb(example, print_enable=True)
-    # quit()
-    #####################################################
+    ser = serial.Serial(PORT, 115200)
 
     # Camera Initial Setting
     ch0, ch1 = env.initial_setting(capnum=2)
-
-    # Camera Reading..
-    for i in range(EPOCH):
-        _, frame0, _, frame1 = env.camera_read(ch0, ch1)
-
-        """ Exercise 2: Webcam Real-time Reading """
-        ############## YOU MUST EDIT ONLY HERE ##############
-        #env.image_show(frame0, frame1)
-        #####################################################
-
-        """ Exercise 3: Object Detection (Traffic Light Circle) """
-        #################### YOU MUST EDIT ONLY HERE ####################
-        # color = env.object_detection(frame0, sample=16, print_enable=True)
-        #################################################################
-
-        """ Exercise 4: Specific Edge Detection (Traffic Line) """
-        #################### YOU MUST EDIT ONLY HERE ####################
-        # direction = env.edge_detection(frame0, width=500, height=120,
-        #                                gap=40, threshold=150, print_enable=True)
-        # env.edge_detection(frame0, width=500, height=120,
-        #                                 gap=40, threshold=150, print_enable=True)
-        env.run(frame1)
-        #################################################################
-
-        # Process Termination (If you input the 'q', camera scanning is ended.)
-        if env.loop_break():
-            break
+    count = 0
+    while(True):
+        frame = env.jinhyuk_set()
+        env.run(frame)
+        data = int(env.cam_steer * 250)
+        if(count >= 20 and abs(data) < 10):
+            ser.write(str(data).encode())
+            print(f"send {data}")
+            count = 0
+        else:
+            count += 1
+    

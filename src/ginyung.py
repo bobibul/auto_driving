@@ -27,7 +27,8 @@ import numpy as np                   # pip install numpy
 import matplotlib.pyplot as plt      # pip install matplotlib
 from rplidar import RPLidar          # pip install rplidar-roboticia
 from math import *
-
+import datetime
+import os
 
 np.set_printoptions(threshold=sys.maxsize, linewidth=150)
 
@@ -56,8 +57,13 @@ DIRECTION = ("FORWARD", "LEFT", "RIGHT")
 HUE_THRESHOLD = ([4, 176], [40, 80], [110, 130], [20, 40])
 CAMERA_HEIGHT = 480
 CAMERA_WIDTH = 640
+# REGION = np.array([
+#             [(15, CAMERA_HEIGHT), (CAMERA_WIDTH - 15, CAMERA_HEIGHT), (CAMERA_WIDTH - 170, 300), (170, 300)]
+            
+#         ], dtype= np.int32)
 REGION = np.array([
-            [(15, CAMERA_HEIGHT), (CAMERA_WIDTH - 15, CAMERA_HEIGHT), (CAMERA_WIDTH - 170, 300), (170, 300)]
+            [(0, CAMERA_HEIGHT), (CAMERA_WIDTH, CAMERA_HEIGHT), (CAMERA_WIDTH - 130, 300), (130, 300)]
+            
         ], dtype= np.int32)
 DST_POINTS = np.array([
     [0, CAMERA_HEIGHT],        
@@ -66,90 +72,6 @@ DST_POINTS = np.array([
     [0, 0]                  
 ], dtype=np.int32)
 """-----------------------------------------------------"""
-
-
-"""
--------------------------------------------------------------------
-  CLASS PURPOSE: Arduino Exercise Library
-  Author: SungBhin Oh
-  Revised: 2022-11-14
--------------------------------------------------------------------
-"""
-# noinspection PyMethodMayBeStatic
-class libARDUINO(object):
-    def __init__(self):
-        self.port = None
-        self.baudrate = None
-        self.wait_time = WAIT_TIME  # second unit
-
-    # Arduino Serial USB Port Setting
-    def init(self, port, baudrate):
-        ser = serial.Serial()
-        ser.port, self.port = port, port
-        ser.baudrate, self.baudrate = baudrate, baudrate
-        ser.open()
-        time.sleep(self.wait_time)
-        return ser
-
-
-"""
--------------------------------------------------------------------
-  CLASS PURPOSE: LiDAR Sensor Exercise Library
-  Author: YoungSoo Do
-  Revised: 2022-11-18
--------------------------------------------------------------------
-"""
-class libLIDAR(object):
-    def __init__(self, port):
-        self.rpm = 0
-        self.lidar = RPLidar(port)
-        self.scan = []
-
-    def init(self):
-        info = self.lidar.get_info()
-        print(info)
-
-    def getState(self):
-        health = self.lidar.get_health()
-        print(health)
-
-    def scanning(self):
-        scan_list = []
-        iterator = self.lidar.iter_measures(SCAN_TYPE, MAX_BUFFER_SIZE)
-        for new_scan, quality, angle, distance in iterator:
-            if new_scan:
-                if len(scan_list) > SAMPLE_RATE:
-                    np_data = np.array(list(scan_list))
-                    yield np_data[:, 1:]
-                scan_list = []
-            if distance > MIN_DISTANCE:
-                scan_list.append((quality, angle, distance))
-
-    def stop(self):
-        self.lidar.stop()
-        self.lidar.stop_motor()
-        self.lidar.disconnect()
-
-    def setRPM(self, rpm):
-        self.lidar.motor_speed = rpm
-
-    def getRPM(self):
-        return self.lidar.motor_speed
-
-    def getAngleRange(self, scan, minAngle, maxAngle):
-        data = np.array(scan)
-        condition = np.where((data[:, 0] < maxAngle) & (data[:, 0] > minAngle))
-        return data[condition]
-
-    def getDistanceRange(self, scan, minDist, maxDist):
-        data = np.array(scan)
-        condition = np.where((data[:, 1] < maxDist) & (data[:, 1] > minDist))
-        return data[condition]
-
-    def getAngleDistanceRange(self, scan, minAngle, maxAngle, minDist, maxDist):
-        data = np.array(scan)
-        condition = np.where((data[:, 0] < maxAngle) & (data[:, 0] > minAngle) & (data[:, 1] < maxDist) & (data[:, 1] > minDist))
-        return data[condition]
 
 
 """
@@ -166,6 +88,7 @@ class libCAMERA(object):
         self.row, self.col, self.dim = (0, 0, 0)
         self.nothing_flag = False
         self.cam_flag = False
+        self.cap = cv2.VideoCapture(2)
 
     def loop_break(self):
         if cv2.waitKey(10) & 0xFF == ord('q'):
@@ -176,6 +99,10 @@ class libCAMERA(object):
 
     def file_read(self, img_path):
         return np.array(cv2.imread(img_path))
+    
+    def jinhyuk_set(self):
+        ret, frame = self.cap.read()
+        return frame
 
 
     def initial_setting(self, cam0port=0, cam1port=1, capnum=1):
@@ -216,7 +143,66 @@ class libCAMERA(object):
             cv2.imshow('frame0', frame0)
             cv2.imshow('frame1', frame1)
 
-    
+    ### Save image
+
+    def save_image(self, frame):
+        # images 디렉토리가 존재하지 않으면 생성
+        if not os.path.exists('images'):
+            os.makedirs('images')
+
+        # 현재 시간을 파일명에 포함시켜 저장
+        filename = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + ".png"
+        filepath = os.path.join('images', filename)
+        cv2.imwrite(filepath, frame)
+        print(f"Image saved as {filepath}")
+
+
+    ### OBJECT Detection
+
+    def detection(self, img, model):
+        result = model.predict(source=img, save=False)
+        try:
+            obj_list = ['red','crosswalk', 'green']
+            box_color_list = [(50,50,255), (0,204,0), (194,153,255), (255,204,51), (255,102,204), (0,153,255)]
+            det_result_obj = []
+            det_result_size = []
+            det_result_coord = result[0].boxes.xyxy.tolist()
+
+            for i in range(len(result[0].boxes.cls.tolist())):
+                x1 = int(result[0].boxes.xyxy.tolist()[i][0])
+                x2 = int(result[0].boxes.xyxy.tolist()[i][2])
+                y1 = int(result[0].boxes.xyxy.tolist()[i][1])
+                y2 = int(result[0].boxes.xyxy.tolist()[i][3])
+                det_result_obj.append(int(result[0].boxes.cls[i]))
+                det_result_size.append(round((x2-x1)*(y2-y1)/(img.shape[0]*img.shape[1])*100,3))
+
+                box_color = box_color_list[int(result[0].boxes.cls[i])]
+                text_color = (0, 0, 0)
+                cv2.rectangle(img, (x1, y1), (x2, y2), box_color, 2)
+                txt_loc = (max(x1+2, 0), max(y1+2, 0))
+                txt = obj_list[int(result[0].boxes.cls[i])]
+                img_h, img_w, _ = img.shape
+                if txt_loc[0] >= img_w or txt_loc[1] >= img_h:
+                    cv2.imshow('result', img)
+                    cv2.waitKey(1)
+                    return [det_result_obj, det_result_size, det_result_coord]
+                margin = 3
+                size = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 1, 1)
+                w = size[0][0] + margin * 2
+                h = size[0][1] + margin * 2
+                cv2.rectangle(img, (x1-1, y1-1-h), (x1+w, y1), box_color, -1)
+                cv2.putText(img, txt, (x1+margin, y1-margin-2), cv2.FONT_HERSHEY_SIMPLEX, 1, text_color, lineType=cv2.LINE_AA)
+            cv2.imshow('result', img)
+            cv2.waitKey(1)
+            return [det_result_obj, det_result_size, det_result_coord]
+        except Exception:
+            return [0]
+
+
+
+
+    ### LANE Detection
+
     # def detect_color(self, img):
     #     # Convert to HSV color space
     #     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -238,21 +224,21 @@ class libCAMERA(object):
     
         # Define range of blend color in HSV
         white_lower = np.array([0, 0, 200])
-        white_upper = np.array([179, 64, 255])
+        white_upper = np.array([138, 38, 255])
         
         # Slightly greenish white color range in HSV
-        greenish_white_lower = np.array([60, 0, 200])
-        greenish_white_upper = np.array([120, 150, 255])
+        # greenish_white_lower = np.array([60, 0, 200])
+        # greenish_white_upper = np.array([120, 150, 255])
     
         # Threshold the HSV image to get only white colors
         white_mask = cv2.inRange(hsv, white_lower, white_upper)
-        greenish_white_mask = cv2.inRange(hsv, greenish_white_lower, greenish_white_upper)
+        # greenish_white_mask = cv2.inRange(hsv, greenish_white_lower, greenish_white_upper)
     
         # Combine the masks
-        combined_mask = cv2.bitwise_or(white_mask, greenish_white_mask)
+        # combined_mask = cv2.bitwise_or(white_mask, greenish_white_mask)
     
         # Threshold the HSV image to get blend colors
-        combined_color = cv2.bitwise_and(img, img, mask=combined_mask)
+        combined_color = cv2.bitwise_and(img, img, mask=white_mask)
         return combined_color
 
     def img_warp(self, img, white_color):
@@ -278,7 +264,7 @@ class libCAMERA(object):
         #         [self.img_x - src_side_offset[0], self.img_y - src_side_offset[1]],
         #     ]
         # )
-        # # 아래 2 개 점 기준으로 dst 영역을 설정합니다.
+        # 아래 2 개 점 기준으로 dst 영역을 설정합니다.
         # dst_offset = [round(self.img_x * 0.125), 0]
         # # offset x 값이 작아질 수록 dst box width 증가합니다.
         # dst = np.float32(
@@ -290,6 +276,9 @@ class libCAMERA(object):
         #     ]
         # )
 
+        # M = cv2.getPerspectiveTransform(np.array([
+        #     [(2, 208), (318, 204), (295, 103), (9, 104)]
+        # ], dtype= np.int32).astype(np.float32), DST_POINTS.astype(np.float32))
         M = cv2.getPerspectiveTransform(REGION.astype(np.float32), DST_POINTS.astype(np.float32))
         white_line = cv2.warpPerspective(white_color, M, (CAMERA_WIDTH, CAMERA_HEIGHT))
         # # find perspective matrix
@@ -306,21 +295,34 @@ class libCAMERA(object):
         return binary_line # 480 * 640
 
     def detect_nothing(self):
-        self.nothing_left_x_base = round(self.img_x * 0.140625)
-        self.nothing_right_x_base = self.img_x - round(self.img_x * 0.140625)
+        # self.nothing_left_x_base = round(self.img_x * 0.140625)
+        # self.nothing_right_x_base = self.img_x - round(self.img_x * 0.140625)
+
+        # self.nothing_pixel_left_x = np.array(
+        #     np.zeros(self.nwindows) + round(self.img_x * 0.140625)
+        # )
+
+        # self.nothing_pixel_right_x = np.array(
+        #     np.zeros(self.nwindows) + self.img_x - round(self.img_x * 0.140625)
+        # )
+
+        # self.nothing_pixel_y = np.array(
+        #     [round(self.window_height / 2) * index for index in range(0, self.nwindows)]
+        # )
+        self.nothing_left_x_base = round(self.img_x * 0.1)
+        self.nothing_right_x_base = self.img_x - round(self.img_x * 0.1)
 
         self.nothing_pixel_left_x = np.array(
-            np.zeros(self.nwindows) + round(self.img_x * 0.140625)
+            np.zeros(self.nwindows) + round(self.img_x * 0.1)
         )
 
         self.nothing_pixel_right_x = np.array(
-            np.zeros(self.nwindows) + self.img_x - round(self.img_x * 0.140625)
+            np.zeros(self.nwindows) + self.img_x - round(self.img_x * 0.1)
         )
 
         self.nothing_pixel_y = np.array(
             [round(self.window_height / 2) * index for index in range(0, self.nwindows)]
-        )
-
+        )        
     def window_search(self, binary_line): # 변수 : 윈도우 개수, 마진, 곱하는 상수들 변수
         # histogram을 생성합니다.
         # y축 기준 절반 아래 부분만을 사용하여 x축 기준 픽셀의 분포를 구합니다.
@@ -352,6 +354,7 @@ class libCAMERA(object):
         # 개수가 너무 많으면 연산량이 증가하여 시간이 오래 걸립니다.
         window_height = self.window_height
         # 윈도우의 너비를 지정합니다. 윈도우가 옆 차선까지 넘어가지 않게 사이즈를 적절히 지정합니다.
+        # margin = 80
         margin = 80
         # 탐색할 최소 픽셀의 개수를 지정합니다.
         min_pix = min_pix = round((margin * 2 * window_height) * 0.0031)
@@ -374,8 +377,12 @@ class libCAMERA(object):
             # print("check param : \n",window,win_y_low,win_y_high)
 
             # position 기준 window size. current left, right 기준으로 window number만큼 좌우, 상하 너비의 윈도우가 설정이 된다. 
-            win_x_left_low = left_x_current - margin
-            win_x_left_high = left_x_current + margin
+            if window > 6:  
+                win_x_left_low = 0 
+                win_x_left_high = 0  
+            else:             
+                win_x_left_low = left_x_current - margin 
+                win_x_left_high = left_x_current + margin
             win_x_right_low = right_x_current - margin
             win_x_right_high = right_x_current + margin
 
@@ -415,11 +422,16 @@ class libCAMERA(object):
             left_lane_idx.append(good_left_idx)
             right_lane_idx.append(good_right_idx)
 
+            left_3 = 0
+            initial_right = 10
             # window내 설정한 pixel개수 이상이 탐지되면, 픽셀들의 x 좌표 평균으로 업데이트 합니다.
             if len(good_left_idx) > min_pix:
                 left_x_current = np.int32(np.mean(lane_pixel_x[good_left_idx]))
+                left_3 = window
             if len(good_right_idx) > min_pix:
                 right_x_current = np.int32(np.mean(lane_pixel_x[good_right_idx]))
+                if initial_right > window:
+                    initial_right = window
 
         # np.concatenate(array) => axis 0으로 차원 감소 시킵니다.(window개수로 감소)
         left_lane_idx = np.concatenate(left_lane_idx)
@@ -431,6 +443,7 @@ class libCAMERA(object):
         right_x = lane_pixel_x[right_lane_idx]
         right_y = lane_pixel_y[right_lane_idx]
 
+
         # 좌우 차선 별 2차함수 계수를 추정합니다.
         if len(left_x) == 0 and len(right_x) == 0:
             left_x = self.nothing_pixel_left_x
@@ -438,15 +451,30 @@ class libCAMERA(object):
             right_x = self.nothing_pixel_right_x
             right_y = self.nothing_pixel_y
         else:
-            if len(left_x) == 0:
-                left_x = right_x - self.img_x / 2
-                left_y = right_y
-            elif len(right_x) == 0:
-                right_x = left_x + self.img_x / 2
-                right_y = left_y
+            if len(left_x) == 0 or left_3 < 3:
+                if len(right_x) != 0:
+                    left_x = right_x - self.img_x / 2
+                    left_y = right_y
+                else:
+                    left_x = self.nothing_pixel_left_x
+                    left_y = self.nothing_pixel_y
+                    right_x = self.nothing_pixel_right_x
+                    right_y = self.nothing_pixel_y
+            elif len(right_x) == 0 or initial_right < 7:
+                if len(left_x) != 0:
+                    right_x = left_x + self.img_x / 2
+                    right_y = left_y
+                else:
+                    left_x = self.nothing_pixel_left_x
+                    left_y = self.nothing_pixel_y
+                    right_x = self.nothing_pixel_right_x
+                    right_y = self.nothing_pixel_y
 
-        left_fit = np.polyfit(left_y, left_x, 2)
-        right_fit = np.polyfit(right_y, right_x, 2)
+
+        left_fit = np.polyfit(left_y, left_x, 2, rcond=0.001)
+        right_fit = np.polyfit(right_y, right_x, 2, rcond=0.001)
+        # left_fit = np.polyfit(left_y, left_x, 2)
+        # right_fit = np.polyfit(right_y, right_x, 2)
         # 좌우 차선 별 추정할 y좌표입니다.
         plot_y = np.linspace(0, binary_line.shape[0] - 1, 5)
         # 좌우 차선 별 2차 곡선을 추정합니다.
@@ -576,6 +604,7 @@ class libCAMERA(object):
     def run(self, img):  # 기능의 순서를 배치하는 함수(run) 설정
         self.nwindows = 10
         self.window_height = np.int32(img.shape[0] / self.nwindows)
+        
         blend_color = self.detect_color(img)
         blend_line = self.img_warp(img, blend_color)
         binary_line = self.img_binary(blend_line)
@@ -595,7 +624,7 @@ class libCAMERA(object):
         meter_per_pix_x, meter_per_pix_y = self.meter_per_pixel()
         left_curve_radius, right_curve_radius = self.calc_curve(left_x, left_y, right_x, right_y)
         vehicle_offset = self.calc_vehicle_offset(sliding_window_img, left_x, left_y, right_x, right_y)
-        cam_steer = self.cam_cal_steer(left_curve_radius, right_curve_radius, vehicle_offset)
+        self.cam_steer = self.cam_cal_steer(left_curve_radius, right_curve_radius, vehicle_offset)
         #ctrl_cmd_msg = self.erp42_ctrl_cmd()
         #if abs(vehicle_offset) > 1.35:
         #    ctrl_cmd_msg.steering = cam_steer
@@ -604,8 +633,8 @@ class libCAMERA(object):
         #if self.end_time - self.start_time >= 0.1:
         #    self.car_ctrl_pub.publish(ctrl_cmd_msg)
         self.cam_flag = False
-        print("offset: ",vehicle_offset, "  steer: ",cam_steer)
-
+        print("offset: ",vehicle_offset, "  steer: ",self.cam_steer)
+        # print(img.shape , sliding_window_img.shape)
 
         cv2.namedWindow("img", cv2.WINDOW_NORMAL)
         cv2.namedWindow("sliding_window_img", cv2.WINDOW_NORMAL)
@@ -614,7 +643,6 @@ class libCAMERA(object):
         cv2.imshow("img", img)
         cv2.imshow("sliding_window_img", sliding_window_img)
         cv2.waitKey(1)
-
 
 
 

@@ -1,6 +1,5 @@
 import cv2
 from camera_detect import Camera
-from serial_connect import SerialConnect
 
 """--------------Computer Vision Variable--------------"""
 NULL = 0
@@ -13,11 +12,10 @@ HUE_THRESHOLD = ([20, 170], [30, 90], [110, 130], [20, 40])
 
 """-----------------------------------------------------"""
 
-class TrafficLight(Camera, SerialConnect):
+class TrafficLight(Camera):
 
     def __init__(self, camera_id, port):
         Camera.__init__(self, camera_id)
-        SerialConnect.__init__(self, port)
         print("신호등 카메라 연결되었습니다.")
 
         self.red_count = 0
