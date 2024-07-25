@@ -62,7 +62,7 @@ CAMERA_WIDTH = 640
             
 #         ], dtype= np.int32)
 REGION = np.array([
-            [(0, CAMERA_HEIGHT), (CAMERA_WIDTH, CAMERA_HEIGHT), (CAMERA_WIDTH - 130, 300), (130, 300)]
+            [(0, CAMERA_HEIGHT), (CAMERA_WIDTH, CAMERA_HEIGHT), (CAMERA_WIDTH - 130, 370), (130, 370)]
             
         ], dtype= np.int32)
 DST_POINTS = np.array([
@@ -96,15 +96,21 @@ class libCAMERA(object):
             return True
         else:
             return False
-
-    def file_read(self, img_path):
-        return np.array(cv2.imread(img_path))
     
     def jinhyuk_set(self):
         ret, frame = self.cap.read()
         return frame
 
 
+    def camera_read(self, cap1, cap2=None):
+        result, capset = [], [cap1, cap2]
+
+        for idx in range(0, self.capnum):
+            ret, frame = capset[idx].read()
+            result.extend([ret, frame])
+
+        return result
+    
     def initial_setting(self, cam0port=0, cam1port=1, capnum=1):
         # OpenCV Initial Setting
         print("OpenCV Version:", cv2.__version__)
@@ -126,15 +132,7 @@ class libCAMERA(object):
                 print("Camera Channel1 is enabled!")
 
         return channel0, channel1
-
-    def camera_read(self, cap1, cap2=None):
-        result, capset = [], [cap1, cap2]
-
-        for idx in range(0, self.capnum):
-            ret, frame = capset[idx].read()
-            result.extend([ret, frame])
-
-        return result
+    
 
     def image_show(self, frame0, frame1=None):
         if frame1 is None:
@@ -201,22 +199,6 @@ class libCAMERA(object):
 
 
 
-    ### LANE Detection
-
-    # def detect_color(self, img):
-    #     # Convert to HSV color space
-    #     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
-    #     # Define range of blend color in HSV
-    #     white_lower = np.array([0, 0, 200])
-    #     white_upper = np.array([179, 64, 255])
-
-    #     # Threshold the HSV image to get only white colors
-    #     white_mask = cv2.inRange(hsv, white_lower, white_upper)
-
-    #     # Threshold the HSV image to get blend colors
-    #     white_color = cv2.bitwise_and(img, img, mask=white_mask)
-    #     return white_color
 
     def detect_color(self, img):
         # Convert to HSV color space
@@ -322,7 +304,9 @@ class libCAMERA(object):
 
         self.nothing_pixel_y = np.array(
             [round(self.window_height / 2) * index for index in range(0, self.nwindows)]
-        )        
+        )
+        
+                
     def window_search(self, binary_line): # 변수 : 윈도우 개수, 마진, 곱하는 상수들 변수
         # histogram을 생성합니다.
         # y축 기준 절반 아래 부분만을 사용하여 x축 기준 픽셀의 분포를 구합니다.
@@ -643,6 +627,3 @@ class libCAMERA(object):
         cv2.imshow("img", img)
         cv2.imshow("sliding_window_img", sliding_window_img)
         cv2.waitKey(1)
-
-
-

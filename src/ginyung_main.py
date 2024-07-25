@@ -14,14 +14,17 @@ if __name__ == "__main__":
     # Camera Initial Setting
     ch0, ch1 = env.initial_setting(capnum=2)
     count = 0
+    sum = 0
     while(True):
         frame = env.jinhyuk_set()
         env.run(frame)
-        data = int(env.cam_steer * 250)
-        if(count >= 20 and abs(data) < 10):
-            ser.write(str(data).encode())
+        sum += env.cam_steer
+        if(count >= 5):
+            data = str(int(sum / 5 * 2000)) + "\n"
+            ser.write(data.encode())
             print(f"send {data}")
             count = 0
+            sum = 0
         else:
             count += 1
     
