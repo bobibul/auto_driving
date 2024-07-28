@@ -4,8 +4,8 @@
 			"path": ".."
 		},
 		{
-			"name": "test",
-			"path": "../../Documents/PlatformIO/Projects/test"
+			"name": "auto_driving_arduino",
+			"path": "../../Documents/PlatformIO/Projects/auto_driving_arduino"
 		}
 	],
 	"settings": {}

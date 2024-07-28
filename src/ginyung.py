@@ -62,7 +62,7 @@ CAMERA_WIDTH = 640
             
 #         ], dtype= np.int32)
 REGION = np.array([
-            [(0, CAMERA_HEIGHT), (CAMERA_WIDTH, CAMERA_HEIGHT), (CAMERA_WIDTH - 130, 370), (130, 370)]
+             [(241 , 461), (618, 478), (470, 289), (245, 291)]
             
         ], dtype= np.int32)
 DST_POINTS = np.array([
@@ -83,12 +83,12 @@ DST_POINTS = np.array([
 """
 # noinspection PyMethodMayBeStatic
 class libCAMERA(object):
-    def __init__(self):
+    def __init__(self, cam_num):
         self.capnum = 0
         self.row, self.col, self.dim = (0, 0, 0)
         self.nothing_flag = False
         self.cam_flag = False
-        self.cap = cv2.VideoCapture(2)
+        self.cap = cv2.VideoCapture(cam_num)
 
     def loop_break(self):
         if cv2.waitKey(10) & 0xFF == ord('q'):
@@ -199,14 +199,13 @@ class libCAMERA(object):
 
 
 
-
     def detect_color(self, img):
         # Convert to HSV color space
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     
         # Define range of blend color in HSV
-        white_lower = np.array([0, 0, 200])
-        white_upper = np.array([138, 38, 255])
+        white_lower = np.array([0, 0, 180])
+        white_upper = np.array([160, 40, 255])
         
         # Slightly greenish white color range in HSV
         # greenish_white_lower = np.array([60, 0, 200])
@@ -291,39 +290,33 @@ class libCAMERA(object):
         # self.nothing_pixel_y = np.array(
         #     [round(self.window_height / 2) * index for index in range(0, self.nwindows)]
         # )
-        self.nothing_left_x_base = round(self.img_x * 0.1)
-        self.nothing_right_x_base = self.img_x - round(self.img_x * 0.1)
+        self.nothing_left_x_base = round(self.img_x * 0.3)
+        self.nothing_right_x_base = self.img_x - round(self.img_x * 0.3)
 
         self.nothing_pixel_left_x = np.array(
-            np.zeros(self.nwindows) + round(self.img_x * 0.1)
+            np.zeros(self.nwindows) + round(self.img_x * 0.3)
         )
 
         self.nothing_pixel_right_x = np.array(
-            np.zeros(self.nwindows) + self.img_x - round(self.img_x * 0.1)
+            np.zeros(self.nwindows) + self.img_x - round(self.img_x * 0.3)
         )
 
         self.nothing_pixel_y = np.array(
             [round(self.window_height / 2) * index for index in range(0, self.nwindows)]
-        )
-        
-                
+        )        
     def window_search(self, binary_line): # 변수 : 윈도우 개수, 마진, 곱하는 상수들 변수
         # histogram을 생성합니다.
         # y축 기준 절반 아래 부분만을 사용하여 x축 기준 픽셀의 분포를 구합니다.
         bottom_half_y = binary_line.shape[0] / 2
         histogram = np.sum(binary_line[int(bottom_half_y) :, :], axis=0)
         # 히스토그램을 절반으로 나누어 좌우 히스토그램의 최대값의 인덱스를 반환합니다.
-        midpoint = np.int32(histogram.shape[0] / 2)
-        left_x_base = np.argmax(histogram[:midpoint])
-        right_x_base = np.argmax(histogram[midpoint:]) + midpoint
+
+        right_x_base = np.argmax(histogram[:])
         # show histogram
         # plt.hist(histogram)
         # plt.show()
-        if left_x_base == 0: # detect nothing
-            left_x_current = self.nothing_left_x_base
-        else: # 
-            left_x_current = left_x_base
-        if right_x_base == midpoint:
+
+        if right_x_base == 0:
             right_x_current = self.nothing_right_x_base
         else:
             right_x_current = right_x_base
@@ -339,9 +332,9 @@ class libCAMERA(object):
         window_height = self.window_height
         # 윈도우의 너비를 지정합니다. 윈도우가 옆 차선까지 넘어가지 않게 사이즈를 적절히 지정합니다.
         # margin = 80
-        margin = 80
+        margin = 45
         # 탐색할 최소 픽셀의 개수를 지정합니다.
-        min_pix = min_pix = round((margin * 2 * window_height) * 0.0031)
+        min_pix = min_pix = round((margin * 2 * window_height) * 0.04)
 
         # lane_pixel = white color's row and col return.
 
@@ -352,6 +345,12 @@ class libCAMERA(object):
         # pixel index를 담을 list를 만들어 줍니다.
         left_lane_idx = []
         right_lane_idx = []
+        self.left_count = 0
+        self.right_count = 0
+        left_x = []
+        left_y = []
+        right_x = []
+        right_y = []
 
         # Step through the windows one by one
         for window in range(nwindows):
@@ -361,25 +360,12 @@ class libCAMERA(object):
             # print("check param : \n",window,win_y_low,win_y_high)
 
             # position 기준 window size. current left, right 기준으로 window number만큼 좌우, 상하 너비의 윈도우가 설정이 된다. 
-            if window > 6:  
-                win_x_left_low = 0 
-                win_x_left_high = 0  
-            else:             
-                win_x_left_low = left_x_current - margin 
-                win_x_left_high = left_x_current + margin
+       
             win_x_right_low = right_x_current - margin
             win_x_right_high = right_x_current + margin
 
             # window 시각화입니다.
-            if left_x_current != 0:
-                cv2.rectangle(
-                    out_img,
-                    (win_x_left_low, win_y_low),
-                    (win_x_left_high, win_y_high),
-                    (0, 255, 0),
-                    2,
-                )
-            if right_x_current != midpoint:
+            if right_x_current != 0:
                 cv2.rectangle(
                     out_img,
                     (win_x_right_low, win_y_low),
@@ -389,12 +375,6 @@ class libCAMERA(object):
                 )
 
             # 왼쪽 오른쪽 각 차선 픽셀이 window안에 있는 경우 index를 저장합니다.
-            good_left_idx = (
-                (lane_pixel_y >= win_y_low)
-                & (lane_pixel_y < win_y_high)
-                & (lane_pixel_x >= win_x_left_low)
-                & (lane_pixel_x < win_x_left_high)
-            ).nonzero()[0]
             good_right_idx = (
                 (lane_pixel_y >= win_y_low)
                 & (lane_pixel_y < win_y_high)
@@ -403,86 +383,76 @@ class libCAMERA(object):
             ).nonzero()[0]
 
             # Append these indices to the lists
-            left_lane_idx.append(good_left_idx)
-            right_lane_idx.append(good_right_idx)
+            # if len(good_left_idx) > min_pix:
+            #     left_lane_idx.append(good_left_idx)
+            # if len(good_right_idx) > min_pix:
+            #     right_lane_idx.append(good_right_idx)
 
-            left_3 = 0
-            initial_right = 10
+            # left_lane_idx.append(good_left_idx)
+            # right_lane_idx.append(good_right_idx)
+        
+
+            if len(good_right_idx) > min_pix*2:
+                right_x1 = lane_pixel_x[good_right_idx]
+                right_y1 = lane_pixel_y[good_right_idx]
+                right_x.append(np.median(right_x1))
+                right_y.append(np.median(right_y1))
+
+
             # window내 설정한 pixel개수 이상이 탐지되면, 픽셀들의 x 좌표 평균으로 업데이트 합니다.
-            if len(good_left_idx) > min_pix:
-                left_x_current = np.int32(np.mean(lane_pixel_x[good_left_idx]))
-                left_3 = window
             if len(good_right_idx) > min_pix:
-                right_x_current = np.int32(np.mean(lane_pixel_x[good_right_idx]))
-                if initial_right > window:
-                    initial_right = window
+                right_x_current = np.int32(np.median(lane_pixel_x[good_right_idx]))
+                self.right_count += 1
 
-        # np.concatenate(array) => axis 0으로 차원 감소 시킵니다.(window개수로 감소)
-        left_lane_idx = np.concatenate(left_lane_idx)
-        right_lane_idx = np.concatenate(right_lane_idx)
+        # # np.concatenate(array) => axis 0으로 차원 감소 시킵니다.(window개수로 감소)
+        # left_lane_idx = np.concatenate(left_lane_idx)
+        # right_lane_idx = np.concatenate(right_lane_idx)
 
-        # window 별 좌우 도로 픽셀 좌표입니다.
-        left_x = lane_pixel_x[left_lane_idx]
-        left_y = lane_pixel_y[left_lane_idx]
-        right_x = lane_pixel_x[right_lane_idx]
-        right_y = lane_pixel_y[right_lane_idx]
+        # # window 별 좌우 도로 픽셀 좌표입니다.
+        # left_x = lane_pixel_x[left_lane_idx]
+        # left_y = lane_pixel_y[left_lane_idx]
+        # right_x = lane_pixel_x[right_lane_idx]
+        # right_y = lane_pixel_y[right_lane_idx]
 
-
+        # print(self.left_count,self.right_count)
         # 좌우 차선 별 2차함수 계수를 추정합니다.
-        if len(left_x) == 0 and len(right_x) == 0:
-            left_x = self.nothing_pixel_left_x
-            left_y = self.nothing_pixel_y
+        right_x = np.array(right_x)
+        right_y = np.array(right_y)
+
+        if len(right_x) == 0:
             right_x = self.nothing_pixel_right_x
             right_y = self.nothing_pixel_y
         else:
-            if len(left_x) == 0 or left_3 < 3:
-                if len(right_x) != 0:
-                    left_x = right_x - self.img_x / 2
-                    left_y = right_y
-                else:
-                    left_x = self.nothing_pixel_left_x
-                    left_y = self.nothing_pixel_y
-                    right_x = self.nothing_pixel_right_x
-                    right_y = self.nothing_pixel_y
-            elif len(right_x) == 0 or initial_right < 7:
-                if len(left_x) != 0:
-                    right_x = left_x + self.img_x / 2
-                    right_y = left_y
-                else:
-                    left_x = self.nothing_pixel_left_x
-                    left_y = self.nothing_pixel_y
-                    right_x = self.nothing_pixel_right_x
-                    right_y = self.nothing_pixel_y
+            pass
+        right_fit = np.polyfit(right_y, right_x, 1, rcond=0.001)
 
 
-        left_fit = np.polyfit(left_y, left_x, 2, rcond=0.001)
-        right_fit = np.polyfit(right_y, right_x, 2, rcond=0.001)
-        # left_fit = np.polyfit(left_y, left_x, 2)
-        # right_fit = np.polyfit(right_y, right_x, 2)
+
         # 좌우 차선 별 추정할 y좌표입니다.
-        plot_y = np.linspace(0, binary_line.shape[0] - 1, 5)
-        # 좌우 차선 별 2차 곡선을 추정합니다.
-        left_fit_x = left_fit[0] * plot_y**2 + left_fit[1] * plot_y + left_fit[2]
-        right_fit_x = right_fit[0] * plot_y**2 + right_fit[1] * plot_y + right_fit[2]
-        center_fit_x = (right_fit_x + left_fit_x) / 2
 
+        plot_y = np.linspace(0, binary_line.shape[0] - 1, 20)
+        # 좌우 차선 별 2차 곡선을 추정합니다.
+        right_fit_x = right_fit[0] * plot_y + right_fit[1]
+
+        right_slope = right_fit[0]
         # # window안의 lane을 black 처리합니다.
         # out_img[lane_pixel_y[left_lane_idx], lane_pixel_x[left_lane_idx]] = (0, 0, 0)
         # out_img[lane_pixel_y[right_lane_idx], lane_pixel_x[right_lane_idx]] = (0, 0, 0)
 
-        # 양쪽 차선 및 중심 선 pixel 좌표(x,y)로 변환합니다.
-        center = np.asarray(tuple(zip(center_fit_x, plot_y)), np.int32)
-        right = np.asarray(tuple(zip(right_fit_x, plot_y)), np.int32)
-        left = np.asarray(tuple(zip(left_fit_x, plot_y)), np.int32)
 
-        cv2.polylines(out_img, [left], False, (0, 0, 255), thickness=5)
+
+        # 양쪽 차선 및 중심 선 pixel 좌표(x,y)로 변환합니다.
+        right = np.asarray(tuple(zip(right_fit_x, plot_y)), np.int32)
         cv2.polylines(out_img, [right], False, (0, 255, 0), thickness=5)
         sliding_window_img = out_img
-        return sliding_window_img, left, right, center, left_x, left_y, right_x, right_y
+        return sliding_window_img, right, right_x, right_y, right_slope
 
     def meter_per_pixel(self):
+        # world_warp = np.array(
+        #     [[97, 1610], [109, 1610], [109, 1606], [97, 1606]], np.float32
+        # )
         world_warp = np.array(
-            [[97, 1610], [109, 1610], [109, 1606], [97, 1606]], np.float32
+            [[100, 1610], [102, 1610], [102, 1608], [100, 1608]], np.float32
         )
         meter_x = np.sum((world_warp[0] - world_warp[3]) ** 2)
         meter_y = np.sum((world_warp[0] - world_warp[1]) ** 2)
@@ -490,47 +460,9 @@ class libCAMERA(object):
         meter_per_pix_y = meter_y / self.img_y
         return meter_per_pix_x, meter_per_pix_y
 
-    def calc_curve(self, left_x, left_y, right_x, right_y):
-        # WeGo simulation상의 차선의 간격(enu 좌표)을 통해 simulation상의 곡률을 구하는 함수입니다.
-        # # Args:
-        # left_x (np.array): 왼쪽 차선 pixel x값
-        # left_y (np.array): 왼쪽 차선 pixel y값
-        # right_x (np.array): 오른쪽 차선 pixel x값
-        # right_y (np.array): 오른쪽 차선 pixel y값
-        #
-        # Returns:
-        # float: 왼쪽, 오른쪽 차선의 곡률입니다.
 
-        # 640p video/image, so last (lowest on screen) y index is 639
-        y_eval = self.img_x - 1
 
-        # Define conversions in x and y from pixels to meter
-        # meter per pixel in each x, y dimension
-        meter_per_pix_x, meter_per_pix_y = self.meter_per_pixel()
-
-        # Fit new polynomials to x,y in world space(meterinate)
-        left_fit_cr = np.polyfit(left_y * meter_per_pix_y, left_x * meter_per_pix_x, 2)
-        right_fit_cr = np.polyfit(
-            right_y * meter_per_pix_y, right_x * meter_per_pix_x, 2
-        )
-        # Calculate the new radius of curvature
-        left_curve_radius = (
-            (1 + (2 * left_fit_cr[0] * y_eval * meter_per_pix_y + left_fit_cr[1]) ** 2)
-            ** 1.5
-        ) / np.absolute(2 * left_fit_cr[0])
-
-        right_curve_radius = (
-            (
-                1
-                + (2 * right_fit_cr[0] * y_eval * meter_per_pix_y + right_fit_cr[1])
-                ** 2
-            )
-            ** 1.5
-        ) / np.absolute(2 * right_fit_cr[0])
-
-        return left_curve_radius, right_curve_radius
-
-    def calc_vehicle_offset(self, sliding_window_img, left_x, left_y, right_x, right_y):
+    def calc_vehicle_offset(self, sliding_window_img, right_x, right_y):
         # Args:
         # sliding_window_img (_type_): _description_
         # left_x (np.array): 왼쪽 차선 pixel x 값
@@ -541,52 +473,33 @@ class libCAMERA(object):
         # float: 차선 중앙으로부터 이탈정도를 확인합니다. (왼쪽 -, 오른쪽 +)
 
         # 좌우 차선 별 2차함수 계수 추정합니다.
-        left_fit = np.polyfit(left_y, left_x, 2)
-        right_fit = np.polyfit(right_y, right_x, 2)
+        right_fit = np.polyfit(right_y, right_x, 1)
 
         # Calculate vehicle center offset in pixels
         bottom_y = sliding_window_img.shape[0] - 1
-        bottom_x_left = (
-            left_fit[0] * (bottom_y**2) + left_fit[1] * bottom_y + left_fit[2]
-        )
         bottom_x_right = (
-            right_fit[0] * (bottom_y**2) + right_fit[1] * bottom_y + right_fit[2]
+            right_fit[0] * bottom_y + right_fit[1]
         )
         vehicle_offset = (
-            sliding_window_img.shape[1] / 2 - (bottom_x_left + bottom_x_right) / 2
+            468 - bottom_x_right
         )
-
+        # print(bottom_x_right)
         # Convert pixel offset to meter
         meter_per_pix_x, meter_per_pix_y = self.meter_per_pixel()
         vehicle_offset *= meter_per_pix_x
 
         return vehicle_offset
 
-    def cam_cal_steer(self, left_curve_radius, right_curve_radius, vehicle_offset):
-        curvature = 1 / ((left_curve_radius + right_curve_radius) / 2)
-        cam_steer = (atan((1 * curvature) / 1 - (1 / 2) * curvature)) * 100
-        if vehicle_offset > 0:
-            # cam_steer = -atan(curvature)
-            cam_steer = -cam_steer
-        else:
-            # cam_steer = atan(curvature)
-            cam_steer = cam_steer
+    def cam_cal_steer(self, vehicle_offset, right_slope):
+        err = np.arctan(right_slope)*180/np.pi
+        cam_steer = - err/30 - vehicle_offset*3
+        #print("err: ", err, "vehicle offset: ", vehicle_offset, "steer: ",cam_steer)
         return cam_steer
 
-    def erp42_ctrl_cmd(self): # 차체 상황에 맞게 고쳐서 활용한다.
-        self.ctrl_cmd_msg.longlCmdType = (
-            2  # 1 : Throttle  /  2 : Velocity  /  3 : Acceleration
-        )
-        self.ctrl_cmd_msg.accel = 0  # cmd_type이 1일때 원하는 엑셀을 넣어준다. (0~1)
-        self.ctrl_cmd_msg.brake = 0  # cmd_type이 1일때 원하는 브레이크값을 넣어준다. (0~1)
-        self.ctrl_cmd_msg.steering = 0  # cmd_type이 1일때 원하는 바퀴 각도를 넣어준다. (rad)
-        self.ctrl_cmd_msg.velocity = 8  # cmd_type이 2일때 원하는 속도를 넣어준다.(km/h)
-        self.ctrl_cmd_msg.acceleration = 0  # cmd_type이 3일때 원하는 가속도를 넣어준다. (m/s^2)
-        return self.ctrl_cmd_msg
 
 
     def run(self, img):  # 기능의 순서를 배치하는 함수(run) 설정
-        self.nwindows = 10
+        self.nwindows = 20
         self.window_height = np.int32(img.shape[0] / self.nwindows)
         
         blend_color = self.detect_color(img)
@@ -597,33 +510,21 @@ class libCAMERA(object):
             self.nothing_flag = True
         (
          sliding_window_img,
-         left,
          right,
-         center,
-         left_x,
-         left_y,
          right_x,
          right_y,
+         right_slope
         ) = self.window_search(binary_line)
         meter_per_pix_x, meter_per_pix_y = self.meter_per_pixel()
-        left_curve_radius, right_curve_radius = self.calc_curve(left_x, left_y, right_x, right_y)
-        vehicle_offset = self.calc_vehicle_offset(sliding_window_img, left_x, left_y, right_x, right_y)
-        self.cam_steer = self.cam_cal_steer(left_curve_radius, right_curve_radius, vehicle_offset)
-        #ctrl_cmd_msg = self.erp42_ctrl_cmd()
-        #if abs(vehicle_offset) > 1.35:
-        #    ctrl_cmd_msg.steering = cam_steer
-        #else:
-        #    ctrl_cmd_msg.steering = 0
-        #if self.end_time - self.start_time >= 0.1:
-        #    self.car_ctrl_pub.publish(ctrl_cmd_msg)
+        vehicle_offset = self.calc_vehicle_offset(sliding_window_img, right_x, right_y)
+        self.cam_steer = self.cam_cal_steer(vehicle_offset, right_slope)
         self.cam_flag = False
-        print("offset: ",vehicle_offset, "  steer: ",self.cam_steer)
-        # print(img.shape , sliding_window_img.shape)
 
         cv2.namedWindow("img", cv2.WINDOW_NORMAL)
         cv2.namedWindow("sliding_window_img", cv2.WINDOW_NORMAL)
-        # cv2.imshow("blend_color", blend_color)
-        # cv2.imshow("blend_line", blend_line)
         cv2.imshow("img", img)
         cv2.imshow("sliding_window_img", sliding_window_img)
         cv2.waitKey(1)
+    
+    def run_yolo(self, img, model):
+        self.detection(img, model)
