@@ -526,5 +526,3 @@ class libCAMERA(object):
         cv2.imshow("sliding_window_img", sliding_window_img)
         cv2.waitKey(1)
     
-    def run_yolo(self, img, model):
-        self.detection(img, model)

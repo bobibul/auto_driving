@@ -4,29 +4,31 @@ import ginyung as fl
 import serial
 import time
 
-PORT = '/dev/ttyUSB1'
+PORT = '/dev/ttyUSB0'
 
 if __name__ == "__main__":
     # Exercise Environment Setting
-    env_line = fl.libCAMERA(cam_num = 2)
-    env_light = fl.libCAMERA(cam_num = 4)
+    env_line = fl.libCAMERA(cam_num = 4)
+    env_light = fl.libCAMERA(cam_num = 2)
     ser = serial.Serial(PORT, 115200)
 
     # Camera Initial Setting
-    ch0, ch1 = env_line.initial_setting(capnum = 2)
     model = YOLO('src/best.pt')
 
-    count = 0
-    sum = 0
     while(True):
         frame1 = env_line.jinhyuk_set()
         frame2 = env_light.jinhyuk_set()
 
-        env_light.run_yolo(frame2, model)
         env_line.run(frame1)
+        result = env_light.detection(frame2, model)
 
-        data = "o" + str(int(env_line.cam_steer * -5)) + "\n"
+        if (0 in result[0]) : 
+            data = "r"
+            print("red")
+        elif(2 in result[0]):
+            data = "g"
+            print("green")
+        else:
+            data = "o" + str(-5*int(env_line.cam_steer)) + "\n"
+
         ser.write(data.encode())
-        print(data)
-        count = 0
-        sum = 0
