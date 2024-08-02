@@ -62,9 +62,13 @@ CAMERA_WIDTH = 640
             
 #         ], dtype= np.int32)
 REGION = np.array([
-             [(241 , 461), (618, 478), (470, 289), (245, 291)]
-            
+            [(207 , 479), (618, 478), (486, 337), (207, 340)]      
         ], dtype= np.int32)
+
+REGION2 = np.array([
+            [(214 , 358), (8, 354), (63, 281), (218, 287)]      
+        ], dtype= np.int32)
+
 DST_POINTS = np.array([
     [0, CAMERA_HEIGHT],        
     [CAMERA_WIDTH, CAMERA_HEIGHT], 
@@ -88,6 +92,7 @@ class libCAMERA(object):
         self.row, self.col, self.dim = (0, 0, 0)
         self.nothing_flag = False
         self.cam_flag = False
+        self.obstacle1 = False
         self.cap = cv2.VideoCapture(cam_num)
 
     def loop_break(self):
@@ -260,7 +265,10 @@ class libCAMERA(object):
         # M = cv2.getPerspectiveTransform(np.array([
         #     [(2, 208), (318, 204), (295, 103), (9, 104)]
         # ], dtype= np.int32).astype(np.float32), DST_POINTS.astype(np.float32))
-        M = cv2.getPerspectiveTransform(REGION.astype(np.float32), DST_POINTS.astype(np.float32))
+        if self.obstacle1 == False:
+            M = cv2.getPerspectiveTransform(REGION.astype(np.float32), DST_POINTS.astype(np.float32))
+        else:
+            M = cv2.getPerspectiveTransform(REGION2.astype(np.float32), DST_POINTS.astype(np.float32))
         white_line = cv2.warpPerspective(white_color, M, (CAMERA_WIDTH, CAMERA_HEIGHT))
         # # find perspective matrix
         # matrix = cv2.getPerspectiveTransform(src, dst)
@@ -307,11 +315,15 @@ class libCAMERA(object):
     def window_search(self, binary_line): # 변수 : 윈도우 개수, 마진, 곱하는 상수들 변수
         # histogram을 생성합니다.
         # y축 기준 절반 아래 부분만을 사용하여 x축 기준 픽셀의 분포를 구합니다.
-        bottom_half_y = binary_line.shape[0] / 2
+        bottom_half_y = binary_line.shape[0]/2
         histogram = np.sum(binary_line[int(bottom_half_y) :, :], axis=0)
         # 히스토그램을 절반으로 나누어 좌우 히스토그램의 최대값의 인덱스를 반환합니다.
 
-        right_x_base = np.argmax(histogram[:])
+        if self.obstacle1 == False:
+            reversed_index = np.argmax(histogram[::-1])
+            right_x_base = len(histogram) - 1 - reversed_index
+        else:
+            right_x_base = np.argmax(histogram[::])
         # show histogram
         # plt.hist(histogram)
         # plt.show()
@@ -332,7 +344,7 @@ class libCAMERA(object):
         window_height = self.window_height
         # 윈도우의 너비를 지정합니다. 윈도우가 옆 차선까지 넘어가지 않게 사이즈를 적절히 지정합니다.
         # margin = 80
-        margin = 45
+        margin = 40
         # 탐색할 최소 픽셀의 개수를 지정합니다.
         min_pix = min_pix = round((margin * 2 * window_height) * 0.04)
 
@@ -480,9 +492,14 @@ class libCAMERA(object):
         bottom_x_right = (
             right_fit[0] * bottom_y + right_fit[1]
         )
-        vehicle_offset = (
-            468 - bottom_x_right
-        )
+        if self.obstacle1:
+            vehicle_offset = (
+                522 - bottom_x_right
+            )
+        else:
+            vehicle_offset = (
+                383 - bottom_x_right
+            )
         # print(bottom_x_right)
         # Convert pixel offset to meter
         meter_per_pix_x, meter_per_pix_y = self.meter_per_pixel()
@@ -493,7 +510,6 @@ class libCAMERA(object):
     def cam_cal_steer(self, vehicle_offset, right_slope):
         err = np.arctan(right_slope)*180/np.pi
         cam_steer = - err/30 - vehicle_offset*3
-        #print("err: ", err, "vehicle offset: ", vehicle_offset, "steer: ",cam_steer)
         return cam_steer
 
 
@@ -525,4 +541,3 @@ class libCAMERA(object):
         cv2.imshow("img", img)
         cv2.imshow("sliding_window_img", sliding_window_img)
         cv2.waitKey(1)
-    
