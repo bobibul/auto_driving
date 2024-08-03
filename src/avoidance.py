@@ -13,28 +13,31 @@ if __name__ == "__main__":
     env_line = fl.libCAMERA(cam_num = 2)
     env_light = fl.libCAMERA(cam_num = 4)
     ser = serial.Serial(PORT, 115200)
-    lidar = RPLidar(port = LIDAR_PORT, baudrate = 115200)
+    lidar = RPLidar(port = LIDAR_PORT)
     lidar.stop()
+    lidar.stop_motor()
     model = YOLO('src/best.pt')
     env_line.obstacle1 = False
     sequence = 0
 
+    frame2 = env_light.jinhyuk_set()
+    result = env_light.detection(frame2, model)
+
     for scan in lidar.iter_scans(max_buf_meas = False):
+        lidar_cycle = time.time()
         for (_, angle, distance) in scan:
             adjusted_angle = angle % 360
-            
-            if adjusted_angle > 180:
-                adjusted_angle -= 360 
 
-            if -15 <= adjusted_angle <= 15:
+            if adjusted_angle < 15 or adjusted_angle > 345:
                 dist = distance
-                break
+
+            if(time.time() - lidar_cycle >= 0.05): break
 
         frame1 = env_line.jinhyuk_set()
         env_line.run(frame1)
 
 
-        if(dist < 1200 and sequence != 3):
+        if(dist < 1000 and sequence != 3):
             match sequence:
                 case 0:
                     data = "x"
