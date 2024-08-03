@@ -3,6 +3,7 @@ import keyboard
 import ginyung as fl
 import serial
 import time
+import cv2
 
 PORT = '/dev/ttyUSB0'
 
@@ -21,10 +22,6 @@ if __name__ == "__main__":
 
         env_line.run(frame1)
         result = env_light.detection(frame2, model)
-
-        if ser.in_waiting > 0:
-            line = ser.readline().decode('utf-8').rstrip()  
-            print(line)
 
         if (0 in result[0]) : 
             data = "r"

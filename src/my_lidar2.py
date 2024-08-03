@@ -1,5 +1,6 @@
 from rplidar import RPLidar
 import threading
+import numpy as np
 
 PORT_NAME = '/dev/ttyUSB1'
 lidar = RPLidar(PORT_NAME)
@@ -18,7 +19,9 @@ def lidar_start(lidar):
                     print("turn")
 
 if __name__ == '__main__':
+    count = 0
     lidar_flag = False
+    lidar._set_pwm(10)
     for scan in lidar.iter_scans():
         for (_, angle, distance) in scan:
             adjusted_angle = angle % 360
@@ -28,4 +31,3 @@ if __name__ == '__main__':
 
             if -15 <= adjusted_angle <= 15:
                 print(distance)
-                
