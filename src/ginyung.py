@@ -38,9 +38,15 @@ class libCAMERA(object):
     def jinhyuk_set(self):
         ret, frame = self.cap.read()
         return frame
+    
+    def cv2imshow(self):
+        ret, frame = self.cap.read()
+        cv2.imshow('cnn', frame)
 
-    def detection(self, img, model):
-        result = model.predict(source=img, save=False)
+    def detection(self, model):
+        ret, img = self.cap.read()
+        cv2.imshow('yolo', img)
+        result = model.predict(source=img, save=False, verbose = False)
         try:
             obj_list = ['red','crosswalk', 'green']
             box_color_list = [(50,50,255), (0,204,0), (194,153,255), (255,204,51), (255,102,204), (0,153,255)]
@@ -147,12 +153,9 @@ class libCAMERA(object):
         lane_pixel_y = np.array(lane_pixel[0])
         lane_pixel_x = np.array(lane_pixel[1])
 
-        left_lane_idx = []
-        right_lane_idx = []
         self.left_count = 0
         self.right_count = 0
-        left_x = []
-        left_y = []
+        
         right_x = []
         right_y = []
 
@@ -248,12 +251,13 @@ class libCAMERA(object):
         return cam_steer
 
 
-    def run(self, img): 
+    def run(self): 
+        ret, frame = self.cap.read()
         self.nwindows = 20
-        self.window_height = np.int32(img.shape[0] / self.nwindows)
+        self.window_height = np.int32(frame.shape[0] / self.nwindows)
         
-        blend_color = self.detect_color(img)
-        blend_line = self.img_warp(img, blend_color)
+        blend_color = self.detect_color(frame)
+        blend_line = self.img_warp(frame, blend_color)
         binary_line = self.img_binary(blend_line)
         if self.nothing_flag == False:
             self.detect_nothing()
@@ -272,6 +276,6 @@ class libCAMERA(object):
 
         cv2.namedWindow("img", cv2.WINDOW_NORMAL)
         cv2.namedWindow("sliding_window_img", cv2.WINDOW_NORMAL)
-        cv2.imshow("img", img)
+        cv2.imshow("img", frame)
         cv2.imshow("sliding_window_img", sliding_window_img)
         cv2.waitKey(1)
