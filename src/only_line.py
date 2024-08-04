@@ -7,11 +7,10 @@ PORT = '/dev/ttyUSB0'
 if __name__ == "__main__":
     env_line = fl.libCAMERA(cam_num = 2)
     ser = serial.Serial(PORT, 115200)
-
+    count = 0
     while(True):
-        frame1 = env_line.jinhyuk_set()
 
-        env_line.run(frame1)
-        data = "o" + str(-5*int(env_line.cam_steer)) + "\n"
-
+        env_line.run()
+        data = "o" + str(int(-5 * env_line.cam_steer)) + "\n"
+        print(data)
         ser.write(data.encode())

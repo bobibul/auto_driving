@@ -2,6 +2,7 @@ import ginyung as fl
 import serial
 import time
 from rplidar import RPLidar
+import tensorflow as tf
 
 PORT = '/dev/ttyUSB0'
 LIDAR_PORT = '/dev/ttyUSB1'
@@ -18,8 +19,9 @@ if __name__ == "__main__":
 
     env_line.obstacle1 = False
     sequence = 0
-    dist = 10000
+    dist = 10000    
     result = []
+    model = tf.keras.models.load_model('src/cnnmodel_1.h5')
     
     env_light.cv2imshow()
     for i, scan in enumerate(lidar.iter_scans(max_buf_meas = False)):
@@ -56,7 +58,9 @@ if __name__ == "__main__":
                     sequence = 2
 
                 elif sequence == 3:
-                    env_light.cv2imshow()
+                    result = env_light.cnn_detection(model)
+                    if(result > 0.9) : data = "g"
+                    elif(result < 0.1) : data = "r"
                     
 
 

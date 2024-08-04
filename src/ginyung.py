@@ -6,17 +6,18 @@ import matplotlib.pyplot as plt
 from rplidar import RPLidar          
 from math import *
 
+
 np.set_printoptions(threshold=sys.maxsize, linewidth=150)
 
 CAMERA_HEIGHT = 480
 CAMERA_WIDTH = 640
 
 REGION = np.array([
-            [(207 , 479), (618, 478), (486, 337), (207, 340)]      
+            [(327 , 475), (616, 479), (480, 342), (327, 345)]      
         ], dtype= np.int32)
 
 REGION2 = np.array([
-            [(214 , 358), (8, 354), (63, 281), (218, 287)]      
+            [(270 , 328), (83, 324), (48, 391), (250, 407)]      
         ], dtype= np.int32)
 
 DST_POINTS = np.array([
@@ -42,48 +43,6 @@ class libCAMERA(object):
     def cv2imshow(self):
         ret, frame = self.cap.read()
         cv2.imshow('cnn', frame)
-
-    def detection(self, model):
-        ret, img = self.cap.read()
-        cv2.imshow('yolo', img)
-        result = model.predict(source=img, save=False, verbose = False)
-        try:
-            obj_list = ['red','crosswalk', 'green']
-            box_color_list = [(50,50,255), (0,204,0), (194,153,255), (255,204,51), (255,102,204), (0,153,255)]
-            det_result_obj = []
-            det_result_size = []
-            det_result_coord = result[0].boxes.xyxy.tolist()
-
-            for i in range(len(result[0].boxes.cls.tolist())):
-                x1 = int(result[0].boxes.xyxy.tolist()[i][0])
-                x2 = int(result[0].boxes.xyxy.tolist()[i][2])
-                y1 = int(result[0].boxes.xyxy.tolist()[i][1])
-                y2 = int(result[0].boxes.xyxy.tolist()[i][3])
-                det_result_obj.append(int(result[0].boxes.cls[i]))
-                det_result_size.append(round((x2-x1)*(y2-y1)/(img.shape[0]*img.shape[1])*100,3))
-
-                box_color = box_color_list[int(result[0].boxes.cls[i])]
-                text_color = (0, 0, 0)
-                cv2.rectangle(img, (x1, y1), (x2, y2), box_color, 2)
-                txt_loc = (max(x1+2, 0), max(y1+2, 0))
-                txt = obj_list[int(result[0].boxes.cls[i])]
-                img_h, img_w, _ = img.shape
-                if txt_loc[0] >= img_w or txt_loc[1] >= img_h:
-                    cv2.imshow('result', img)
-                    cv2.waitKey(1)
-                    return [det_result_obj, det_result_size, det_result_coord]
-                margin = 3
-                size = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 1, 1)
-                w = size[0][0] + margin * 2
-                h = size[0][1] + margin * 2
-                cv2.rectangle(img, (x1-1, y1-1-h), (x1+w, y1), box_color, -1)
-                cv2.putText(img, txt, (x1+margin, y1-margin-2), cv2.FONT_HERSHEY_SIMPLEX, 1, text_color, lineType=cv2.LINE_AA)
-            cv2.imshow('result', img)
-            cv2.waitKey(1)
-            return [det_result_obj, det_result_size, det_result_coord]
-        except Exception:
-            return [0]
-
 
     def detect_color(self, img):
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -249,15 +208,22 @@ class libCAMERA(object):
         err = np.arctan(right_slope)*180/np.pi
         cam_steer = - err/30 - vehicle_offset*3
         return cam_steer
-
+    
+    def cnn_detection(self, model):
+        _, img = self.cap.read()
+        img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+        img = img/255.0
+        img = img.reshape(1,640,480,3)
+        res = model.predict(img)
+        return res
 
     def run(self): 
-        ret, frame = self.cap.read()
+        _, self.frame = self.cap.read()
         self.nwindows = 20
-        self.window_height = np.int32(frame.shape[0] / self.nwindows)
+        self.window_height = np.int32(self.frame.shape[0] / self.nwindows)
         
-        blend_color = self.detect_color(frame)
-        blend_line = self.img_warp(frame, blend_color)
+        blend_color = self.detect_color(self.frame)
+        blend_line = self.img_warp(self.frame, blend_color)
         binary_line = self.img_binary(blend_line)
         if self.nothing_flag == False:
             self.detect_nothing()
@@ -276,6 +242,6 @@ class libCAMERA(object):
 
         cv2.namedWindow("img", cv2.WINDOW_NORMAL)
         cv2.namedWindow("sliding_window_img", cv2.WINDOW_NORMAL)
-        cv2.imshow("img", frame)
+        cv2.imshow("img", self.frame)
         cv2.imshow("sliding_window_img", sliding_window_img)
         cv2.waitKey(1)
