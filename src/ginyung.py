@@ -1,9 +1,7 @@
 
 import sys
 import cv2                           
-import numpy as np                   
-import matplotlib.pyplot as plt     
-from rplidar import RPLidar          
+import numpy as np                                
 from math import *
 
 
@@ -34,15 +32,15 @@ class libCAMERA(object):
         self.nothing_flag = False
         self.cam_flag = False
         self.obstacle1 = False
-        self.cap = cv2.VideoCapture(cam_num)
+        self.cap = cv2.VideoCapture(cam_num, cv2.CAP_DSHOW)
 
-    def jinhyuk_set(self):
-        ret, frame = self.cap.read()
-        return frame
     
-    def cv2imshow(self):
-        ret, frame = self.cap.read()
-        cv2.imshow('cnn', frame)
+    def captureimage(self,x,y,w,h):
+        _, self.frame = self.cap.read()
+        self.roi = self.frame[y:y+h, x:x+w]
+        cv2.namedWindow("img", cv2.WINDOW_NORMAL)
+        cv2.imshow('img', self.roi)
+        cv2.waitKey(1)
 
     def detect_color(self, img):
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -206,15 +204,20 @@ class libCAMERA(object):
 
     def cam_cal_steer(self, vehicle_offset, right_slope):
         err = np.arctan(right_slope)*180/np.pi
-        cam_steer = - err/30 - vehicle_offset*3
+        cam_steer = - err/80 - vehicle_offset * 2.2
         return cam_steer
     
-    def cnn_detection(self, model):
-        _, img = self.cap.read()
-        img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
-        img = img/255.0
-        img = img.reshape(1,640,480,3)
-        res = model.predict(img)
+    def cnn_detection(self, model,x,y,w,h):
+        _, frame = self.cap.read()
+        frame = frame[y:y+h, x:x+w]
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        resized_frame = cv2.resize(rgb_frame, (h, w))  # 크기 조정
+        normalized_frame = resized_frame / 255.0  # 정규화
+        input_data = np.expand_dims(normalized_frame, axis= 0 )  # 배치와 채널 차원 추가
+        res = model.predict(input_data)
+        cv2.imshow('cnn', frame)
+        cv2.waitKey(1)
+
         return res
 
     def run(self): 
@@ -239,7 +242,6 @@ class libCAMERA(object):
         vehicle_offset = self.calc_vehicle_offset(sliding_window_img, right_x, right_y)
         self.cam_steer = self.cam_cal_steer(vehicle_offset, right_slope)
         self.cam_flag = False
-
         cv2.namedWindow("img", cv2.WINDOW_NORMAL)
         cv2.namedWindow("sliding_window_img", cv2.WINDOW_NORMAL)
         cv2.imshow("img", self.frame)
