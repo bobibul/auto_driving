@@ -11,11 +11,11 @@ CAMERA_HEIGHT = 480
 CAMERA_WIDTH = 640
 
 REGION = np.array([
-            [(327 , 475), (616, 479), (480, 342), (327, 345)]      
+            [(245 , 477), (630, 478), (493, 317), (245, 324)]      
         ], dtype= np.int32)
 
 REGION2 = np.array([
-            [(270 , 328), (83, 324), (48, 391), (250, 407)]      
+            [(232 , 398), (1, 400), (86, 277), (244, 281)]      
         ], dtype= np.int32)
 
 DST_POINTS = np.array([
@@ -44,12 +44,32 @@ class libCAMERA(object):
 
     def detect_color(self, img):
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    
-        white_lower = np.array([0, 0, 180])
-        white_upper = np.array([160, 40, 255])
+        
+        # Define HSV range for white color (two ranges combined)
+        white_lower = np.array([0, 0, 215])
+        white_upper = np.array([0, 0, 255])
         white_mask = cv2.inRange(hsv, white_lower, white_upper)
-        combined_color = cv2.bitwise_and(img, img, mask=white_mask)
-        return combined_color
+        
+        white_lower2 = np.array([100, 0, 135])
+        white_upper2 = np.array([160, 40, 255])
+        white_mask2 = cv2.inRange(hsv, white_lower2, white_upper2)
+        
+        # Combine both white masks
+        combined_mask = cv2.bitwise_or(white_mask, white_mask2)
+        
+        if self.obstacle1:
+            # Define HSV range for gray color (to be excluded)
+            gray_lower = np.array([100, 10, 120])   # Adjust based on the specific gray shade you want to exclude
+            gray_upper = np.array([160, 40, 170])
+            gray_mask = cv2.inRange(hsv, gray_lower, gray_upper)
+        
+            # Subtract the gray mask from the combined mask
+            combined_mask = cv2.subtract(combined_mask, gray_mask)
+        
+        # Apply the final mask to the original image
+        final_color = cv2.bitwise_and(img, img, mask=combined_mask)
+        
+        return final_color
 
     def img_warp(self, img, white_color):
         self.img_x, self.img_y = img.shape[1], img.shape[0]
@@ -157,7 +177,7 @@ class libCAMERA(object):
             right_y = self.nothing_pixel_y
         else:
             pass
-        right_fit = np.polyfit(right_y, right_x, 1, rcond=0.001)
+        right_fit = np.polyfit(right_y, right_x, 1)
 
         plot_y = np.linspace(0, binary_line.shape[0] - 1, 20)
 
@@ -207,6 +227,12 @@ class libCAMERA(object):
         cam_steer = - err/80 - vehicle_offset * 2.2
         return cam_steer
     
+    def cv2_imshow(self,x,y,w,h):
+        _, frame = self.cap.read()
+        frame = frame[y:y+h, x:x+w]
+        cv2.imshow('cnn', frame)
+        cv2.waitKey(1)
+    
     def cnn_detection(self, model,x,y,w,h):
         _, frame = self.cap.read()
         frame = frame[y:y+h, x:x+w]
@@ -242,8 +268,8 @@ class libCAMERA(object):
         vehicle_offset = self.calc_vehicle_offset(sliding_window_img, right_x, right_y)
         self.cam_steer = self.cam_cal_steer(vehicle_offset, right_slope)
         self.cam_flag = False
-        cv2.namedWindow("img", cv2.WINDOW_NORMAL)
+        # cv2.namedWindow("img", cv2.WINDOW_NORMAL)
         cv2.namedWindow("sliding_window_img", cv2.WINDOW_NORMAL)
-        cv2.imshow("img", self.frame)
+        # cv2.imshow("img", self.frame)
         cv2.imshow("sliding_window_img", sliding_window_img)
         cv2.waitKey(1)

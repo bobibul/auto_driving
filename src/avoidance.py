@@ -7,7 +7,7 @@ import tensorflow as tf
 PORT = 'COM8'
 LIDAR_PORT = 'COM5'
 TASK = 2
-ROI_X,ROI_Y,ROI_W,ROI_H = 250, 50, 200, 100
+ROI_X,ROI_Y,ROI_W,ROI_H = 250, 80, 200, 140
 
 
 if __name__ == "__main__":
@@ -25,16 +25,20 @@ if __name__ == "__main__":
     model_path = "src/my_model.h5"
     model = tf.keras.models.load_model(model_path)
 
+    
+
+
     data = input("s 를 입력하여 장애물 회피 미션 수행 : ")
     ser.write(data.encode())
     
     for i, scan in enumerate(lidar.iter_scans(max_buf_meas = False)):
         dist = scan[0][2]
+        result = env_light.cv2_imshow(ROI_X,ROI_Y,ROI_W,ROI_H)
 
         for j in range(TASK):
             env_line.run()
             
-            if(dist < 1200 and sequence != 3):
+            if(dist < 1300 and sequence != 3):
                 if(sequence == 0):
                     data = "x"
                     env_line.obstacle1 = True
@@ -53,9 +57,9 @@ if __name__ == "__main__":
 
             else:
                 if(env_line.obstacle1):
-                    data = "o" + str(int(5 * env_line.cam_steer)) + "\n"
+                    data = "o" + str(int(6 * env_line.cam_steer)) + "\n"
                 else:
-                    data = "o" + str(int(-5 * env_line.cam_steer)) + "\n"
+                    data = "o" + str(int(-6 * env_line.cam_steer)) + "\n"
 
                 if sequence == 1:
                     sequence = 2
